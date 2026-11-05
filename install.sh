@@ -1,5 +1,5 @@
 #!/usr/bin/bash
-# SPDX-License-Identifier: GPL-2.0-only
+# SPDX-License-Identifier: MIT
 set -euo pipefail
 
 src=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)

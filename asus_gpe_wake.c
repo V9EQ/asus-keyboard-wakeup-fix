@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-only
+// SPDX-License-Identifier: MIT OR GPL-2.0-only
 /*
  * ASUS FX608JPR GPE14 keyboard wake workaround.
  * Unloading restores the original wake mask, not the capability flag.
@@ -78,6 +78,6 @@ static void __exit asus_gpe_wake_exit(void)
 module_init(asus_gpe_wake_init);
 module_exit(asus_gpe_wake_exit);
 
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("Dual MIT/GPL");
 MODULE_DESCRIPTION("GPE14 keyboard wake workaround for ASUS FX608JPR");
 MODULE_VERSION("1.0");

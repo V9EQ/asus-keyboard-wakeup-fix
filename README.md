@@ -125,4 +125,6 @@ No firmware dumps, keypress data, or diagnostic logs are included.
 
 ## License
 
-GPL-2.0-only. See [LICENSE](LICENSE).
+The project is available under the [MIT License](LICENSE).
+
+`asus_gpe_wake.c` is dual-licensed under **MIT OR GPL-2.0-only**, at your option. The GPL alternative is included in [LICENSES/GPL-2.0-only.txt](LICENSES/GPL-2.0-only.txt). Its kernel metadata uses `MODULE_LICENSE("Dual MIT/GPL")` because the module uses the GPL-only exported `dmi_match` symbol. The GPL option applies when combining the module with the Linux kernel; the source remains available under MIT as an alternative. Linux itself is not relicensed by this project.
