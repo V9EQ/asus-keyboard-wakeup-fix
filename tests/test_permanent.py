@@ -47,6 +47,8 @@ class DropinTests(unittest.TestCase):
                 boot_root=root / "boot",
                 proc_config=root / "unavailable-proc-config.gz",
                 checksum_file=checksum,
+                override_dir=root / "overrides",
+                vendor_override_dir=root / "vendor-overrides",
             )
         )
 
@@ -111,6 +113,14 @@ class DropinTests(unittest.TestCase):
         result = self.run_guard()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("CONFIG_ACPI_TABLE_UPGRADE", result.stderr)
+
+    def test_extra_payload_rejected(self):
+        directory = self.script.parent / "overrides"
+        directory.mkdir()
+        (directory / "other.aml").write_bytes(b"unreviewed")
+        result = self.run_guard()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Unreviewed extra AML", result.stderr)
 
     def test_forced_lockdown_kernel_rejected(self):
         self.config.write_text(CAPABLE_CONFIG + "CONFIG_LOCK_DOWN_KERNEL_FORCE_INTEGRITY=y\n")

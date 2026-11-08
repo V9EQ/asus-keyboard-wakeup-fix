@@ -69,6 +69,6 @@ class KernelCapabilitiesTests(unittest.TestCase):
             self.assertIn(Path("/proc/config.gz"), profile.kernel_config_paths("running-kernel"))
 
     def test_kernel_path_traversal_rejected(self):
-        for kernel in ("../../etc", "", "bad/kernel", "name\0"):
+        for kernel in ("../../etc", ".", "..", "", "bad/kernel", "name\0"):
             with self.subTest(kernel=kernel), self.assertRaises(ValueError):
                 profile.kernel_config_paths(kernel)

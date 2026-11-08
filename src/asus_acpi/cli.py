@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 """Prepare model-specific ACPI overrides and an isolated unsigned UKI.
-This tool never signs, installs a boot entry, changes firmware or enables services.
+Offline commands never change the system. install/uninstall default to dry-run;
+explicit --apply rebuilds/signs the reviewed primary UKI, without firmware/menu edits.
 """
 
 import argparse
@@ -13,7 +14,7 @@ import subprocess
 from collections import Counter
 from pathlib import Path
 
-from asus_acpi import patches, permanent, require, uki
+from asus_acpi import installer, patches, permanent, require, uki
 from asus_acpi.profile import (
     TARGETS,
     check_machine,
@@ -214,6 +215,18 @@ def export_mkinitcpio(args):
     )
 
 
+def install(args):
+    info = check_machine(build=True)
+    report = installer.Installer().install(
+        prepared_tables(args.prepared), info, apply=args.apply, adopt=args.adopt_existing
+    )
+    print(json.dumps(report, indent=2))
+
+
+def uninstall(args):
+    print(json.dumps(installer.Installer().uninstall(apply=args.apply), indent=2))
+
+
 def verify(args):
     directory = Path(args.build).resolve()
     base = (directory / "base.unsigned.efi").read_bytes()
@@ -259,6 +272,20 @@ def main():
     )
     p.add_argument("--prepared", required=True)
     p.add_argument("--output", required=True)
+    for command in ("install", "uninstall"):
+        p = sub.add_parser(
+            command, help=f"{command.title()} permanent integration (dry-run by default)"
+        )
+        mode = p.add_mutually_exclusive_group()
+        mode.add_argument(
+            "--apply", action="store_true", help="Explicitly authorize system changes (root)"
+        )
+        mode.add_argument("--dry-run", action="store_true", help="Plan only; this is the default")
+        if command == "install":
+            p.add_argument("--prepared", required=True)
+            p.add_argument(
+                "--adopt-existing", action="store_true", help="Adopt ONLY byte-identical files"
+            )
     p = sub.add_parser("verify", help="Read-only archive/section integrity checks")
     p.add_argument("--prepared", required=True)
     p.add_argument("--build", required=True)

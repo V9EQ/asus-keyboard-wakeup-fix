@@ -84,7 +84,10 @@ def check_machine(build=False, kernel=None):
 
 
 def kernel_config_paths(kernel):
-    require(re.fullmatch(r"[A-Za-z0-9_.+-]+", kernel) is not None, "Invalid kernel release")
+    require(
+        kernel not in (".", "..") and re.fullmatch(r"[A-Za-z0-9_.+-]+", kernel) is not None,
+        "Invalid kernel release",
+    )
     paths = [
         Path("/usr/lib/modules") / kernel / "config",
         Path("/usr/lib/modules") / kernel / "build/.config",

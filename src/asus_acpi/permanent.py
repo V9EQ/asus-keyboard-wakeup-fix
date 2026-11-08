@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""Export reviewable permanent-integration files. No live system writes."""
+"""Render reviewable permanent integration files (export itself never installs)."""
 
 from pathlib import Path
 from shlex import quote
@@ -14,6 +14,8 @@ def render_dropin(
     boot_root="/boot",
     proc_config="/proc/config.gz",
     checksum_file="/usr/local/share/asus-acpi/aml.sha256",
+    override_dir="/etc/initcpio/acpi_override",
+    vendor_override_dir="/usr/lib/initcpio/acpi_override",
 ):
     """Parameters permit sandbox tests; the public CLI always uses real paths."""
     template = r"""# SPDX-License-Identifier: MIT
@@ -27,10 +29,16 @@ _asus_boot=@BOOT@
 [[ $(<"$_asus_sys/class/dmi/id/product_name") == @MODEL@ ]] || _asus_fail 'Unsupported laptop'
 [[ $(<"$_asus_sys/class/dmi/id/bios_version") == @BIOS@ ]] || _asus_fail 'BIOS changed: disable and re-investigate overrides'
 sha256sum --check --status @CHECKSUM@ || _asus_fail 'AML checksum mismatch'
+# The native hook collects both locations, including unreviewed extra payloads.
+for _asus_aml in @OVERRIDES@/*.aml @VENDOR_OVERRIDES@/*.aml; do
+    [[ -e $_asus_aml || -L $_asus_aml ]] || continue
+    [[ -f $_asus_aml && ! -L $_asus_aml ]] || _asus_fail 'Invalid AML file'
+    grep -Fxq -- "$(sha256sum -- "$_asus_aml")" @CHECKSUM@ || _asus_fail 'Unreviewed extra AML'
+done
 [[ -r "$_asus_sys/kernel/security/lockdown" ]] || _asus_fail 'Cannot verify lockdown policy'
 [[ $(<"$_asus_sys/kernel/security/lockdown") == *'[none]'* ]] || _asus_fail 'Lockdown blocks ACPI override; security will not be disabled'
 _asus_kernel=${KERNELVERSION:-}
-[[ $_asus_kernel =~ ^[A-Za-z0-9_.+-]+$ ]] || _asus_fail 'Missing/invalid mkinitcpio KERNELVERSION'
+[[ $_asus_kernel != . && $_asus_kernel != .. && $_asus_kernel =~ ^[A-Za-z0-9_.+-]+$ ]] || _asus_fail 'Missing/invalid mkinitcpio KERNELVERSION'
 _asus_config=''
 for _asus_path in "$_asus_modules/$_asus_kernel/config" "$_asus_modules/$_asus_kernel/build/.config" "$_asus_boot/config-$_asus_kernel"; do
     if [[ -r $_asus_path ]]; then
@@ -55,7 +63,7 @@ case " ${HOOKS[*]} " in
     *' acpi_override '*) ;;
     *) HOOKS+=(acpi_override) ;;
 esac
-unset _asus_sys _asus_modules _asus_boot _asus_kernel _asus_config _asus_path _asus_option
+unset _asus_sys _asus_modules _asus_boot _asus_kernel _asus_config _asus_path _asus_option _asus_aml
 unset -f _asus_fail
 """
     for marker, value in {
@@ -64,6 +72,8 @@ unset -f _asus_fail
         "@BOOT@": boot_root,
         "@PROC@": proc_config,
         "@CHECKSUM@": checksum_file,
+        "@OVERRIDES@": override_dir,
+        "@VENDOR_OVERRIDES@": vendor_override_dir,
         "@VENDOR@": VENDOR,
         "@MODEL@": MODEL,
         "@BIOS@": BIOS,
@@ -75,9 +85,11 @@ unset -f _asus_fail
 REBUILD = """#!/usr/bin/bash
 # SPDX-License-Identifier: MIT
 set -euo pipefail
-/usr/bin/mkinitcpio -P
-/usr/bin/sbctl sign-all -g
-/usr/bin/sbctl verify /boot/EFI/Linux/arch-linux.efi
+exec 9>/run/asus-acpi.lock
+/usr/bin/flock -x 9
+/usr/bin/mkinitcpio -p linux
+/usr/bin/sbctl sign /boot/EFI/Linux/arch-linux.efi
+/usr/bin/sbverify --cert /var/lib/sbctl/keys/db/db.pem /boot/EFI/Linux/arch-linux.efi
 """
 
 NVIDIA_HOOK = """[Trigger]
@@ -96,6 +108,7 @@ Description = Rebuilding and signing UKIs with reviewed ASUS ACPI overrides...
 When = PostTransaction
 Depends = mkinitcpio
 Depends = sbctl
+Depends = sbsigntools
 Exec = /usr/local/libexec/asus-acpi-rebuild
 """
 
@@ -118,11 +131,12 @@ The proposed files mirror absolute destinations underneath root/:
 - etc/mkinitcpio.conf.d/90-asus-acpi.conf: model/BIOS, checksums, lockdown and kernel
   capability guard; adds acpi_override once without rewriting global HOOKS.
 - usr/local/share/asus-acpi/aml.sha256: installed AML integrity checks.
-- usr/local/libexec/asus-acpi-rebuild: rebuild current presets and sign/verify.
+- usr/local/libexec/asus-acpi-rebuild: rebuild the linux preset and sign/verify.
 - etc/pacman.d/hooks/95-asus-acpi-nvidia.hook: explicit driver-update rebuild.
 
 Copy only reviewed files with root ownership (helper 0755; others 0644), then
-rebuild with mkinitcpio -P, sign with sbctl sign-all -g and verify the primary UKI.
+rebuild the reviewed linux preset, sign with sbctl sign and verify using
+sbverify --cert /var/lib/sbctl/keys/db/db.pem /boot/EFI/Linux/arch-linux.efi.
 Validate all payloads in the FIRST early archive before changing boot defaults.
 The existing standard Linux/mkinitcpio hooks rebuild the normal UKI on updates;
 the NVIDIA hook covers embedded driver updates too. Python/uv is not used there.
@@ -135,8 +149,9 @@ image. The build-time BIOS guard cannot undo AML already inside an old UKI.
 Rollback design: restore backed-up/only-managed files, remove the added drop-in,
 AMLs, checksum file and NVIDIA helper/hook, rebuild/sign CURRENT installed kernels.
 Never restore a stale kernel image after package updates without checking modules.
-An atomic privileged installer, adoption of existing installs and automated rollback
-are intentionally NOT implemented yet. Do not blindly copy this tree over /.
+Do not blindly copy this tree over /. The separate asus-acpi install command
+renders these files itself, defaults to dry-run and requires explicit --apply.
+See docs/permanent.md for its restricted layout, conflict checks and rollback limits.
 """
 
 

@@ -61,9 +61,12 @@ uv run asus-acpi export-mkinitcpio --prepared work/prepared --output work/perman
 ```
 
 exports all proposed permanent files, including an idempotent guarded mkinitcpio
-drop-in and NVIDIA rebuild hook. **It does not install them.** See
-[permanent.md](permanent.md) for the remaining privileged installer/rollback work.
-No project operation should silently replace an existing manually installed setup.
+drop-in and NVIDIA rebuild hook. **Export does not install them.** Version 0.4 adds
+`install` and `uninstall`, dry-run by default and privileged only with `--apply`.
+See [permanent.md](permanent.md) for layout restrictions, signing dependencies,
+conflict detection and rollback limits. An existing differing manual installation
+is never silently overwritten. The native helper rebuilds only the reviewed linux
+preset and uses targeted signing plus cryptographic `sbverify` verification.
 
 Once those files have been deliberately installed and tested, standard kernel
 rebuilds include the AML automatically; Python need not regenerate it for every

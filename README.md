@@ -10,7 +10,8 @@ This is an experimental local workaround, not an upstream firmware fix.
 - **`legacy-dkms` branch**: the unchanged previous project and its history.
 
 The old installer is **not** part of the new implementation. Do not run it alongside
-these overrides. Nothing in this repository automatically changes the installed system.
+these overrides. Offline commands do not change the installed system; privileged
+`install/uninstall --apply` are the explicit exception.
 
 ## Current implementation
 
@@ -24,11 +25,13 @@ these overrides. Nothing in this repository automatically changes the installed 
   other UKI sections and compressed main initramfs.
 - Kernel **capability checks**, not a Linux release-number allowlist.
 - Export of permanent mkinitcpio drop-in, AML checksums and NVIDIA update hook.
-  This exports files for review; it is **not yet a privileged installer**.
+- Explicit automatic installation/uninstallation for the reviewed Arch layout,
+  dry-run by default, with conflict checks, private backups and failure rollback.
 
 The implementation rejects other models, BIOS/table fingerprints, incompatible kernels,
 already-patched input tables and ambiguous source layouts. It does not flash BIOS,
-change Secure Boot keys, install a custom kernel module, sign images or modify Limine.
+change Secure Boot keys, install a custom kernel module or modify Limine.
+Only explicit privileged installation/uninstallation rebuilds and signs the primary UKI.
 
 ## Development environment
 
@@ -78,13 +81,25 @@ manual installation. Its build-time guard checks model/BIOS, AML integrity, lock
 and the **kernel being built**, and adds `acpi_override` only once. Python/uv is not
 needed by the exported update hooks.
 
-Read [permanent integration status and next steps](docs/permanent.md) before use.
+Read [installation requirements and recovery limits](docs/permanent.md) before use.
+
+```sh
+uv run asus-acpi install --prepared work/prepared --dry-run
+# Explicit application from a trusted reviewed checkout/environment:
+sudo -- "$PWD/.venv/bin/asus-acpi" install --prepared "$PWD/work/prepared" --apply
+uv run asus-acpi uninstall --dry-run
+```
+
+Requires the reviewed single-linux-preset layout, existing sbctl keys, and
+`sbsigntools` (`sbverify`). Existing differing manual files are never overwritten;
+`--adopt-existing` accepts only byte-identical destinations. No boot-menu changes
+or reboot are performed.
 
 ## Safety and known limits
 
 The table approach was tested on one laptop with Arch Linux, kernel `7.2.14-arch1-1`,
 mkinitcpio 42.2, Limine 12.9.6 and Secure Boot enabled with kernel lockdown disabled.
-The Python 3.13 project passes **85 automated tests**, including userspace ACPICA
+The Python 3.13 project passes **106 automated tests**, including userspace ACPICA
 emulator tests. An offline integration run reproduced all four hardware-tested AML
 payloads byte-for-byte and built/verified a separate unsigned UKI. That newly packaged
 UKI was not installed or booted by the test run. See [test coverage](docs/testing.md).
@@ -116,8 +131,9 @@ hard-pinned: a readable matching kernel configuration and required capabilities 
 checked instead. This is not a guarantee against future driver regressions. Limine
 updates normally do not require regenerating AML. BIOS changes need re-investigation.
 
-The project is not run on each boot. Automatic inclusion in normal mkinitcpio rebuilds
-is possible, but **has not been configured** by this tool. See the detailed
+The project is not run on each boot. Explicit permanent installation configures
+inclusion in normal mkinitcpio rebuilds and an NVIDIA update hook. The development
+machine's prior manual setup was not changed by this work. See the detailed
 [update and compatibility guide](docs/updates.md).
 
 ## License and references
