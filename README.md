@@ -6,10 +6,10 @@ This is an experimental local workaround, not an upstream firmware fix.
 ## Project versions
 
 - **`main`**: Python 3.13 tooling for the ACPI table overrides tested on this laptop.
-- **[`old/`](old/README.md)**: the previous DKMS/kernel-module implementation, retained as an archive.
-- **`legacy-dkms` branch**: the unchanged previous project and its history.
+- **`legacy-dkms` branch**: the archived DKMS/kernel-module implementation and its history;
+  it is not included in `main`.
 
-The old installer is **not** part of the new implementation. Do not run it alongside
+The legacy installer is **not** part of the new implementation. Do not run it alongside
 these overrides. Offline commands do not change the installed system; privileged
 `install/uninstall --apply` are the explicit exception.
 
@@ -139,7 +139,7 @@ machine's prior manual setup was not changed by this work. See the detailed
 ## License and references
 
 New tooling and AML source: [MIT](LICENSE). The archived module retains its original
-MIT/GPL alternative and notices in `old/` and `legacy-dkms`.
+MIT/GPL alternative and notices in the `legacy-dkms` branch.
 
 - [Kernel: ACPI table upgrades via initrd](https://docs.kernel.org/admin-guide/acpi/initrd_table_override.html)
 - [Kernel: SSDT overlays](https://docs.kernel.org/admin-guide/acpi/ssdt-overlays.html)
