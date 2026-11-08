@@ -1,0 +1,10 @@
+# Kernel module build products
+*.o
+*.ko
+*.ko.*
+*.mod
+*.mod.c
+.*.cmd
+*.order
+Module.symvers
+.tmp_versions/

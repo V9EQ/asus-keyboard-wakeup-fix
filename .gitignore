@@ -1,10 +1,22 @@
-# Kernel module build products
-*.o
-*.ko
-*.ko.*
-*.mod
-*.mod.c
-.*.cmd
-*.order
-Module.symvers
-.tmp_versions/
+# uv / Python / Ruff
+.venv/
+__pycache__/
+*.py[cod]
+.ruff_cache/
+*.egg-info/
+
+# Private firmware captures, generated sources, logs, UKIs and keys
+work/
+build/
+dist/
+backups/
+dumps/
+*.aml
+*.dat
+*.efi
+*.img
+*.bin
+*.log
+*.key
+*.pem
+*.der
