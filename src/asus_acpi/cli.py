@@ -13,9 +13,8 @@ import subprocess
 from collections import Counter
 from pathlib import Path
 
-from asus_acpi import patches, require, uki
+from asus_acpi import patches, permanent, require, uki
 from asus_acpi.profile import (
-    KERNEL,
     TARGETS,
     check_machine,
     digest,
@@ -151,7 +150,7 @@ def prepare(args):
         {
             "format": 1,
             "machine": info,
-            "kernel": KERNEL,
+            "kernel": info["kernel"],
             "aml_sha256": prepared,
             "original_sha256": {"DSDT.aml": digest(dsdt)}
             | {f"{key}.aml": digest(data) for key, data in tables.items()},
@@ -164,7 +163,10 @@ def prepared_tables(directory):
     directory = Path(directory).resolve()
     manifest = json.loads((directory / "manifest.json").read_text())
     require(
-        manifest.get("format") == 1 and manifest.get("kernel") == KERNEL, "Unsupported manifest"
+        manifest.get("format") == 1
+        and isinstance(manifest.get("kernel"), str)
+        and bool(manifest["kernel"]),
+        "Unsupported manifest",
     )
     files = manifest["aml_sha256"]
     expected = {f"{name}.aml" for name in TARGETS}
@@ -187,15 +189,28 @@ def prepared_tables(directory):
 
 
 def build(args):
-    check_machine(build=True)
+    image = uki.pe_image(Path(args.base).read_bytes())
+    kernel = image["sections"][".uname"]["data"].rstrip(b"\0").decode()
+    check_machine(build=True, kernel=kernel)
     require(shutil.which("objcopy"), "Install binutils (objcopy)")
     tables = prepared_tables(args.prepared)
     output = output_path(args.output)
-    report = uki.build(args.base, output, tables, KERNEL)
+    report = uki.build(args.base, output, tables, kernel)
     save_json(output / "build.json", report)
     print(json.dumps(report, indent=2))
     print(
         "UNSIGNED artifact only. Preserve a working entry; sign the finished UKI before testing."
+    )
+
+
+def export_mkinitcpio(args):
+    info = check_machine(build=True)
+    tables = prepared_tables(args.prepared)
+    output = output_path(args.output)
+    plan = permanent.export_bundle(output, tables, info)
+    print(json.dumps(plan, indent=2))
+    print(
+        "Export only: no live files changed. Review INSTALL.txt and back up before installation."
     )
 
 
@@ -239,6 +254,11 @@ def main():
     p.add_argument("--prepared", required=True)
     p.add_argument("--base", required=True)
     p.add_argument("--output", required=True)
+    p = sub.add_parser(
+        "export-mkinitcpio", help="Export permanent integration files; NEVER install them"
+    )
+    p.add_argument("--prepared", required=True)
+    p.add_argument("--output", required=True)
     p = sub.add_parser("verify", help="Read-only archive/section integrity checks")
     p.add_argument("--prepared", required=True)
     p.add_argument("--build", required=True)
@@ -248,7 +268,7 @@ def main():
         if args.command == "inspect":
             print(json.dumps(machine(), indent=2))
         else:
-            globals()[args.command](args)
+            globals()[args.command.replace("-", "_")](args)
     except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
         parser.exit(1, f"Error: {error}\n")
 

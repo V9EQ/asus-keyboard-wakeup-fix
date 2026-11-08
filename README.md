@@ -22,8 +22,11 @@ these overrides. Nothing in this repository automatically changes the installed 
   built-in keyboard wake from `s2idle` on the tested laptop.
 - Offline construction of a **separate unsigned UKI**, preserving the kernel,
   other UKI sections and compressed main initramfs.
+- Kernel **capability checks**, not a Linux release-number allowlist.
+- Export of permanent mkinitcpio drop-in, AML checksums and NVIDIA update hook.
+  This exports files for review; it is **not yet a privileged installer**.
 
-The implementation rejects other models, BIOS/table fingerprints, unsupported kernels,
+The implementation rejects other models, BIOS/table fingerprints, incompatible kernels,
 already-patched input tables and ambiguous source layouts. It does not flash BIOS,
 change Secure Boot keys, install a custom kernel module, sign images or modify Limine.
 
@@ -63,11 +66,25 @@ Generated dumps, diffs, AMLs, UKIs and signing keys must not be committed.
 The output UKI is **unsigned**; testing it requires a separately reviewed signing,
 backup and non-default boot-entry procedure. Never overwrite the only working boot image.
 
+## Permanent integration export
+
+```sh
+uv run asus-acpi export-mkinitcpio --prepared work/prepared --output work/permanent
+```
+
+The bundle mirrors proposed system files under `root/`, with a checksummed plan and
+`INSTALL.txt`. It does not copy them to `/`, edit the boot menu or touch an existing
+manual installation. Its build-time guard checks model/BIOS, AML integrity, lockdown
+and the **kernel being built**, and adds `acpi_override` only once. Python/uv is not
+needed by the exported update hooks.
+
+Read [permanent integration status and next steps](docs/permanent.md) before use.
+
 ## Safety and known limits
 
 The table approach was tested on one laptop with Arch Linux, kernel `7.2.14-arch1-1`,
 mkinitcpio 42.2, Limine 12.9.6 and Secure Boot enabled with kernel lockdown disabled.
-The Python 3.13 project passes **60 automated tests**, including userspace ACPICA
+The Python 3.13 project passes **85 automated tests**, including userspace ACPICA
 emulator tests. An offline integration run reproduced all four hardware-tested AML
 payloads byte-for-byte and built/verified a separate unsigned UKI. That newly packaged
 UKI was not installed or booted by the test run. See [test coverage](docs/testing.md).
@@ -94,9 +111,10 @@ uv build
 
 **Do not treat a test UKI as automatically up-to-date.** It freezes the base kernel
 and initramfs, including any embedded NVIDIA module. Linux/NVIDIA updates require a
-fresh base and a rebuilt, signed test image; the current profile deliberately pins
-kernel `7.2.14-arch1-1` until another version is reviewed. Limine updates normally do
-not require regenerating AML. BIOS changes always need re-investigation.
+fresh base and a rebuilt, signed test image. Kernel release numbers are no longer
+hard-pinned: a readable matching kernel configuration and required capabilities are
+checked instead. This is not a guarantee against future driver regressions. Limine
+updates normally do not require regenerating AML. BIOS changes need re-investigation.
 
 The project is not run on each boot. Automatic inclusion in normal mkinitcpio rebuilds
 is possible, but **has not been configured** by this tool. See the detailed

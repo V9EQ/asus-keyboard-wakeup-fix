@@ -72,7 +72,7 @@ class VerifyTests(unittest.TestCase):
             (self.prepared / "aml" / name).write_bytes(data)
         manifest = {
             "format": 1,
-            "kernel": profile.KERNEL,
+            "kernel": profile.TESTED_KERNEL,
             "aml_sha256": {name: profile.digest(data) for name, data in tables.items()},
         }
         (self.prepared / "manifest.json").write_text(json.dumps(manifest))

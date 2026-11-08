@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: MIT
-"""Only the configuration actually investigated and tested is supported."""
+"""Firmware-specific profile and version-independent kernel capability checks."""
 
+import gzip
 import hashlib
 import json
 import platform
@@ -13,7 +14,8 @@ from . import require
 VENDOR = "ASUSTeK COMPUTER INC."
 MODEL = "ASUS TUF Gaming F16 FX608JPR_FX608JPR"
 BIOS = "FX608JPR.312"
-KERNEL = "7.2.14-arch1-1"
+# Historical validation reference, NOT a supported-version allowlist.
+TESTED_KERNEL = "7.2.14-arch1-1"
 DSDT_SHA256 = "f1b720582567c0be363f508a8ccf38cd472de468cbbaf2da39828bfd0165cba7"
 # Raw firmware binaries are deliberately NOT distributed. Hashes are fail-closed
 # guards against patching a different revision/layout under the same table name.
@@ -63,7 +65,7 @@ def machine():
     return result
 
 
-def check_machine(build=False):
+def check_machine(build=False, kernel=None):
     info = machine()
     require(
         info["vendor"] == VENDOR and info["model"] == MODEL,
@@ -72,15 +74,54 @@ def check_machine(build=False):
     require(
         info["bios"] == BIOS, "Unsupported BIOS; re-investigate tables after a firmware update"
     )
-    require(
-        info["kernel"] == KERNEL, "Unsupported running kernel; this profile needs revalidation"
-    )
     if build:
         require(
             info["lockdown"] == "none",
             "ACPI override blocked/unknown under lockdown; do not disable security automatically",
         )
+        check_kernel(kernel or info["kernel"])
     return info
+
+
+def kernel_config_paths(kernel):
+    require(re.fullmatch(r"[A-Za-z0-9_.+-]+", kernel) is not None, "Invalid kernel release")
+    paths = [
+        Path("/usr/lib/modules") / kernel / "config",
+        Path("/usr/lib/modules") / kernel / "build/.config",
+        Path("/boot") / f"config-{kernel}",
+    ]
+    # A running kernel's config must never be used to validate a DIFFERENT UKI.
+    if kernel == platform.release():
+        paths.append(Path("/proc/config.gz"))
+    return paths
+
+
+def check_kernel(kernel):
+    for path in kernel_config_paths(kernel):
+        try:
+            if path.suffix == ".gz":
+                with gzip.open(path, "rt") as stream:
+                    text = stream.read()
+            else:
+                text = path.read_text()
+        except OSError:
+            continue
+        config = dict(re.findall(r"^(CONFIG_[A-Z0-9_]+)=(.*)$", text, re.M))
+        require(config, f"Empty/unrecognized kernel config: {path}")
+        for name in ("CONFIG_X86_64", "CONFIG_BLK_DEV_INITRD", "CONFIG_ACPI_TABLE_UPGRADE"):
+            require(config.get(name) == "y", f"{kernel}: {name}=y is required")
+        for name in (
+            "CONFIG_LOCK_DOWN_KERNEL_FORCE_INTEGRITY",
+            "CONFIG_LOCK_DOWN_KERNEL_FORCE_CONFIDENTIALITY",
+            "CONFIG_ACPI_TABLE_OVERRIDE_VIA_BUILTIN_INITRD",
+        ):
+            require(config.get(name) != "y", f"{kernel}: incompatible {name}=y")
+        return {
+            "kernel": kernel,
+            "config": str(path),
+            "previously_tested": kernel == TESTED_KERNEL,
+        }
+    raise ValueError(f"Cannot verify kernel capabilities for {kernel}; provide its config/headers")
 
 
 def table_header(data):

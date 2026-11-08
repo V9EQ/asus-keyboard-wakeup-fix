@@ -22,7 +22,11 @@ tools are missing. A skipped emulator class is not a full validation run.
   when the sensor exists. No fictitious sensors or changed thermal limits.
 - Compilation and userspace evaluation of the actual GPE14 overlay for S0 only.
 - Exact six-byte OEM identities, including NUL padding rather than assumed spaces.
-- Unsupported model/BIOS/kernel/lockdown rejection, firmware fingerprints and manifests.
+- Unsupported model/BIOS/lockdown rejection, firmware fingerprints and manifests.
+- Candidate-kernel configuration checks instead of version allowlists, including
+  synthetic future releases, missing headers, compressed configs and incompatible policies.
+- Export-only permanent bundles, permissions/hashes, native Bash guard behavior,
+  BIOS changes, tampered payloads and idempotent preservation of HOOKS.
 - Unsafe output paths/symlinks, already-patched inputs and overwritten workspaces.
 - ACPI lengths/checksums, early CPIO bounds/paths/duplicates and unchanged microcode/main archive.
 - PE certificate bounds, unsigned-copy isolation, initrd resize metadata and unchanged
@@ -39,7 +43,7 @@ kernel, change firmware, sign keys, suspend the laptop or edit its boot configur
 
 With Python 3.13.15 and ACPICA 20251212:
 
-- **60 tests passed**, including the emulator class; no tests skipped.
+- **85 tests passed**, including the emulator and native Bash drop-in cases; no tests skipped.
 - Ruff lint/format checks and source/wheel builds passed.
 - A separate ignored `work/` integration run used the preserved original BIOS 312
   tables, generated and compiled all four payloads, and verified that every AML file
